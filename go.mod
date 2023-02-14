@@ -1,4 +1,4 @@
-module github.com/thetillhoff/fileIO/v2
+module github.com/thetillhoff/fileIO
 
 go 1.20
 

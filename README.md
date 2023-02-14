@@ -5,7 +5,7 @@ It can be used to first recursively retrieve all existing filepaths at a specifi
 
 ## Installation
 ```
-go get github.com/thetillhoff/fileIO/v2@v1.0.0 // Change version if needed
+go get github.com/thetillhoff/fileIO@v1.0.0 // Change version if needed
 ```
 
 ## Basic functions
