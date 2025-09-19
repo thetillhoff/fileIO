@@ -1,6 +1,6 @@
 module github.com/thetillhoff/fileIO
 
-go 1.20
+go 1.25.1
 
 require (
 	github.com/radovskyb/watcher v1.0.7

@@ -25,3 +25,14 @@ func TestTrailingSlashWithExistingSlash(t *testing.T) {
 		t.Fatal("expected value of ensureTrailingSlash is", expectedValue, "got", result)
 	}
 }
+
+// Test if the Slash is not added if it's already there yet
+func TestTrailingSlashWithEmptyString(t *testing.T) {
+	expectedValue := ""
+
+	result := ensureTrailingSlash("")
+
+	if result != expectedValue {
+		t.Fatal("expected value of ensureTrailingSlash is", expectedValue, "got", result)
+	}
+}
