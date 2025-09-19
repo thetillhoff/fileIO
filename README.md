@@ -4,14 +4,16 @@ This package provides basic functions for fileIO, but also a FileList object.
 It can be used to first recursively retrieve all existing filepaths at a specific location and then filter them based on different rules.
 
 ## Installation
-```
+
+```sh
 go get github.com/thetillhoff/fileIO@v1.0.0 // Change version if needed
 ```
 
 ## Basic functions
+
 - CopyFile(src string, dst string) error
 - ReadFile(filePath string) ([]byte, error)
-- ReadFileLineByLine(filePath string) ([]string, error) 
+- ReadFileLineByLine(filePath string) ([]string, error)
 - WriteFile(filePath string, []byte content) error
 
 ## The cool stuff
@@ -32,14 +34,17 @@ go get github.com/thetillhoff/fileIO@v1.0.0 // Change version if needed
 ## Development
 
 ### Releases
+
 All releases follow the semantic versioning schema with a `v` prefix. Example: `v1.2.3`
 
 Releases are made via git-tags.
 
 ### Testing
+
 All internal functions and FileList operations are unit tested.
 Actual fileIO functions are not yet tested.
 
 ### TODO
+
 - Implement test functions for actual fileIO operations.
 - Add fileList.FilterByExtension
