@@ -3,68 +3,93 @@ package fileIO
 import (
 	"io/fs"
 	"log"
-	"path"
+	"os"
+	"path/filepath"
 	"time"
 
-	"github.com/radovskyb/watcher"
+	"github.com/fsnotify/fsnotify"
 )
 
-// Will watch all included paths recusively for changes regularly
-// and run the provided actionEvent
-func Watch(inclusionPaths []string, exclusionPaths []string, verbose bool, interval time.Duration, actionEvent func(watcher.Event) error) error {
-	var (
-		err         error
-		w           *watcher.Watcher
-		f           fs.FileInfo
-		watchedPath string
-	)
+// Watch watches inclusionPaths recursively for changes and calls actionEvent with
+// the path of the changed file. exclusionPaths are skipped. interval is used as a
+// debounce window to coalesce rapid changes into a single call.
+func Watch(inclusionPaths []string, exclusionPaths []string, verbose bool, interval time.Duration, actionEvent func(path string) error) error {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	defer w.Close()
 
-	// ignoring before adding, so the "to-be-ignored" paths won't be added
-	w = watcher.New()
-
-	// SetMaxEvents to 1 to allow at most 1 event's to be received
-	// on the Event channel per watching cycle.
-	// If SetMaxEvents is not set, the default is to send all events.
-	w.SetMaxEvents(1)
-
-	for _, exclusionPath := range exclusionPaths { // Set exclusions before inclusions, so they will be already taken into consideration
-		w.Ignore(exclusionPath)
+	excluded := map[string]bool{}
+	for _, p := range exclusionPaths {
+		if abs, err := filepath.Abs(p); err == nil {
+			excluded[abs] = true
+		}
 	}
 
-	for _, recursivePath := range inclusionPaths {
-		if err = w.AddRecursive(recursivePath); err != nil {
+	isExcluded := func(p string) bool {
+		abs, _ := filepath.Abs(p)
+		return excluded[abs]
+	}
+
+	addRecursive := func(root string) error {
+		return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil // skip inaccessible paths
+			}
+			if isExcluded(p) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if d.IsDir() {
+				if verbose {
+					log.Println("Watching:", p)
+				}
+				return w.Add(p)
+			}
+			return nil
+		})
+	}
+
+	for _, p := range inclusionPaths {
+		if err := addRecursive(p); err != nil {
 			return err
 		}
 	}
 
-	if verbose {
-		log.Println("Watched paths/files:")
-		// Print a list of all of the files and folders currently being watched and their paths.
-		for watchedPath, f = range w.WatchedFiles() {
-			log.Println(path.Join(watchedPath, f.Name()))
-		}
-	}
+	var (
+		debounce = time.NewTimer(0)
+		lastPath string
+	)
+	<-debounce.C // drain initial tick
 
-	go func() {
-		for { // while true
-			select {
-			case event := <-w.Event: // receive events
-				err = actionEvent(event)
-				if err != nil {
-					log.Fatalln(err)
-				}
-			case err = <-w.Error: // receive errors
-				log.Fatalln(err)
-			case <-w.Closed:
-				return
+	for {
+		select {
+		case event, ok := <-w.Events:
+			if !ok {
+				return nil
 			}
+			lastPath = event.Name
+			// Automatically watch newly created subdirectories
+			if event.Has(fsnotify.Create) {
+				if info, err := os.Stat(event.Name); err == nil && info.IsDir() && !isExcluded(event.Name) {
+					if err := addRecursive(event.Name); err != nil {
+						log.Println("Failed to watch new directory:", err)
+					}
+				}
+			}
+			debounce.Reset(interval)
+		case <-debounce.C:
+			if err := actionEvent(lastPath); err != nil {
+				log.Println("Watch action error:", err)
+			}
+		case err, ok := <-w.Errors:
+			if !ok {
+				return nil
+			}
+			log.Println("Watcher error:", err)
 		}
-	}()
-
-	// Start the watching process - it'll check for changes every time the interval is over.
-	if err = w.Start(interval); err != nil {
-		return err
 	}
-
-	return nil
 }
